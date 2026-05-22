@@ -1,0 +1,17 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+# Ignore virtual environment directories
+.cp/
+__pycache__/
+# Ignore Python bytecode files
+*.pyc
+# Ignore environment variables file
+.env
+# Ignore virtual environment directories
+.venv/
+venv/
+# Ignore venv directory
+venv/
+# Ignore venv directory
+venv/
+# Ignore venv directory
+venv/

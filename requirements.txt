@@ -1,0 +1,25 @@
+# --- Pipeline pre-entrenado ---
+easyocr>=1.7.1
+torch>=2.1.0
+torchvision>=0.16.0
+
+# --- Modelo CNN+CTC propio ---
+tensorflow>=2.13.0
+
+# --- Interfaz web ---
+streamlit>=1.30.0
+
+# --- Procesamiento de imagen ---
+opencv-python>=4.8.0
+Pillow>=10.0.0
+numpy>=1.24.0
+scikit-image>=0.21.0
+
+# --- Visualización ---
+matplotlib>=3.7.0
+seaborn>=0.13.0
+plotly>=5.17.0
+
+# --- Utilidades ---
+tqdm>=4.66.0
+pandas>=2.0.0
