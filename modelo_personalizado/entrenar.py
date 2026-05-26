@@ -124,7 +124,7 @@ def main():
     modelo = construir_modelo_entrenamiento()
     modelo.summary()
 
-    salida_pesos = Path(__file__).parent / "pesos.h5"
+    salida_pesos = Path(__file__).parent / "pesos.weights.h5"
     callbacks = [
         ModelCheckpoint(str(salida_pesos), save_best_only=False, save_weights_only=True),
         ReduceLROnPlateau(patience=2, factor=0.5, verbose=1),

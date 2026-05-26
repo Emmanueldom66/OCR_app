@@ -29,6 +29,10 @@ from utils import (
     intentar_cargar_modelo_propio,
     predecir_con_modelo_propio,
 )
+import sys
+from pathlib import Path
+# Añadir la raíz del proyecto al path para poder importar segmentacion_ocr
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 # ------------------------------------------------------------------
@@ -71,6 +75,10 @@ with st.sidebar:
     usar_modelo_propio = st.checkbox(
         "Probar también el modelo CNN+CTC propio", value=False,
         help="Requiere que los pesos estén en modelo_personalizado/pesos.h5",
+    )
+    usar_segmentacion = st.checkbox(
+        "Probar también el enfoque de Segmentación + CNN", value=False,
+        help="Segmenta caracteres por contornos y clasifica con CNN entrenada en EMNIST.\nRequiere entrenar primero el clasificador.",
     )
 
     st.markdown("---")
@@ -163,6 +171,58 @@ else:
         file_name="texto_extraido.txt",
         mime="text/plain",
     )
+
+# ------------------------------------------------------------------
+# Enfoque Segmentación + CNN (nuevo)
+# ------------------------------------------------------------------
+if usar_segmentacion:
+    st.markdown("---")
+    st.header("✂️ Resultado con Segmentación + CNN (nuevo enfoque)")
+
+    try:
+        from segmentacion_ocr.pipeline_segmentacion import (
+            cargar_clasificador,
+            reconocer_palabra_segmentacion,
+        )
+        from segmentacion_ocr.segmentador import segmentar_y_visualizar
+        import cv2
+
+        with st.spinner("Cargando clasificador CNN..."):
+            clasificador = cargar_clasificador()
+
+        if clasificador is None:
+            st.warning(
+                "No se encontró el clasificador entrenado. "
+                "Ejecuta: `cd segmentacion_ocr && python clasificador_emnist.py --epochs 15`"
+            )
+        else:
+            with st.spinner("Reconociendo mediante segmentación..."):
+                texto, detalles = reconocer_palabra_segmentacion(clasificador, imagen_np)
+
+            st.success(f"Palabra reconocida: **{texto}**")
+
+            if detalles:
+                st.markdown("**Confianza por carácter:**")
+                cols = st.columns(len(detalles))
+                for i, (car, conf) in enumerate(detalles):
+                    with cols[i]:
+                        st.metric(f"Carácter {i+1}", car, f"{conf:.0%}")
+
+            with st.expander("Mostrar pasos intermedios de segmentación"):
+                caracteres, img_anotada = segmentar_y_visualizar(imagen_np)
+                st.image(img_anotada, caption="Caracteres detectados", use_container_width=True)
+                if caracteres:
+                    st.markdown("**Caracteres extraídos:**")
+                    cols_car = st.columns(min(len(caracteres), 8))
+                    for i, car_img in enumerate(caracteres):
+                        with cols_car[i % len(cols_car)]:
+                            img28 = car_img.reshape(28, 28)
+                            img_rot = np.rot90(img28, 2)
+                            st.image(img_rot, caption=f"Carácter {i+1}", use_container_width=True)
+                else:
+                    st.info("No se detectaron caracteres.")
+    except ImportError as e:
+        st.error(f"Error al importar módulo de segmentación: {e}. Asegúrate de que el directorio `segmentacion_ocr` existe en la raíz del proyecto.")
 
 # ------------------------------------------------------------------
 # Modelo CNN+CTC propio (opcional)

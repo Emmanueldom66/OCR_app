@@ -23,8 +23,9 @@ TAM_VOCAB = len(ALFABETO) + 1  # +1 para el token blanco del CTC
 # ------------------------------------------------------------------
 # Capa CTC (calcula la pérdida durante entrenamiento)
 # ------------------------------------------------------------------
+"""
 class CapaCTC(layers.Layer):
-    """Capa que añade la pérdida CTC al modelo durante entrenamiento."""
+    #Capa que añade la pérdida CTC al modelo durante entrenamiento.
 
     def __init__(self, name: str | None = None, **kwargs):
         super().__init__(name=name, **kwargs)
@@ -42,6 +43,42 @@ class CapaCTC(layers.Layer):
         )
         self.add_loss(tf.reduce_mean(perdida))
         return y_pred
+"""
+
+class CapaCTC(layers.Layer):
+    def __init__(self, blank_index=62, name=None, **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.blank_index = blank_index   # índice del token blanco (último)
+
+    def call(self, y_true, y_pred):
+        batch = tf.shape(y_pred)[0]
+        time = tf.shape(y_pred)[1]
+
+        # Logits: si y_pred ya es softmax, convertimos a logits
+        logits = tf.math.log(y_pred + 1e-9)
+
+        # Longitudes
+        input_length = tf.fill([batch], time)
+        mask = tf.cast(tf.not_equal(y_true, -1), tf.int32)
+        label_length = tf.reduce_sum(mask, axis=1)
+
+        # Convertir y_true a int32
+        y_true_int = tf.cast(y_true, tf.int32)
+
+        # Calcular pérdida CTC con tf.nn.ctc_loss
+        loss = tf.nn.ctc_loss(
+            labels=y_true_int,
+            logits=logits,
+            label_length=label_length,
+            logit_length=input_length,
+            logits_time_major=False,          # porque logits es (batch, time, classes)
+            blank_index=self.blank_index
+        )
+        self.add_loss(tf.reduce_mean(loss))
+        return y_pred
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[1]
 
 
 # ------------------------------------------------------------------
