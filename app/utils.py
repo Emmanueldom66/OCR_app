@@ -58,7 +58,7 @@ def dibujar_cajas(imagen: np.ndarray, resultados) -> np.ndarray:
 # ------------------------------------------------------------------
 # Modelo CNN+CTC propio (opcional)
 # ------------------------------------------------------------------
-PESOS_PATH = Path(__file__).parent.parent / "modelo_personalizado" / "pesos.h5"
+PESOS_PATH = Path(__file__).parent.parent / "modelo_personalizado" / "pesos.weights.h5"
 
 
 @st.cache_resource(show_spinner=False)

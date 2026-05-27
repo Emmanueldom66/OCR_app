@@ -46,39 +46,50 @@ class CapaCTC(layers.Layer):
 """
 
 class CapaCTC(layers.Layer):
-    def __init__(self, blank_index=62, name=None, **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.blank_index = blank_index   # índice del token blanco (último)
+    """Capa CTC que añade la pérdida correctamente."""
+    
+    def __init__(self, blank_index=62, **kwargs):
+        super().__init__(**kwargs)
+        self.blank_index = blank_index  # índice del token blanco (último del vocabulario)
 
     def call(self, y_true, y_pred):
+        # y_true: shape (batch, max_label_len), con -1 para padding
+        # y_pred: shape (batch, time, num_classes)
         batch = tf.shape(y_pred)[0]
         time = tf.shape(y_pred)[1]
 
-        # Logits: si y_pred ya es softmax, convertimos a logits
+        # Logits (si y_pred ya es softmax, tomamos log)
         logits = tf.math.log(y_pred + 1e-9)
 
-        # Longitudes
+        # Longitud de la entrada (todas las secuencias tienen la misma longitud 'time')
         input_length = tf.fill([batch], time)
+
+        # Longitudes reales de las etiquetas (contando valores != -1)
         mask = tf.cast(tf.not_equal(y_true, -1), tf.int32)
         label_length = tf.reduce_sum(mask, axis=1)
 
-        # Convertir y_true a int32
+        # y_true debe ser int32 para tf.nn.ctc_loss
         y_true_int = tf.cast(y_true, tf.int32)
 
-        # Calcular pérdida CTC con tf.nn.ctc_loss
+        # Calcular pérdida CTC
         loss = tf.nn.ctc_loss(
             labels=y_true_int,
             logits=logits,
             label_length=label_length,
             logit_length=input_length,
-            logits_time_major=False,          # porque logits es (batch, time, classes)
+            logits_time_major=False,          # porque nuestro logits es (batch, time, classes)
             blank_index=self.blank_index
         )
         self.add_loss(tf.reduce_mean(loss))
         return y_pred
 
     def compute_output_shape(self, input_shape):
+        # input_shape es (shape_y_true, shape_y_pred)
+        # La capa devuelve y_pred, así que retornamos shape_y_pred
         return input_shape[1]
+
+    def compute_output_spec(self, inputs, training=None):
+        return inputs[1]
 
 
 # ------------------------------------------------------------------
@@ -125,7 +136,9 @@ def construir_modelo_entrenamiento(altura: int = 32, ancho: int = 128) -> Model:
     y_pred = layers.Dense(TAM_VOCAB, activation="softmax", name="salida_softmax")(x)
 
     # Pérdida CTC
-    salida = CapaCTC(name="ctc")(etiqueta, y_pred)
+    #salida = CapaCTC(name="ctc")(etiqueta, y_pred)
+    # Dentro de construir_modelo_entrenamiento
+    salida = CapaCTC(blank_index=TAM_VOCAB - 1, name="ctc")(etiqueta, y_pred)
 
     modelo = Model(inputs=[entrada_img, etiqueta], outputs=salida, name="CRNN_CTC")
     modelo.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3))
