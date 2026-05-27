@@ -2,21 +2,21 @@
 
 **Reconocimiento Óptico de Caracteres (OCR) con Aprendizaje Profundo**
 
-Autor: Emmanuel Domínguez Osio
-Programa: Ingeniería en Mecatrónica / Sistemas de Control
-Curso: Inteligencia Artificial (Licenciatura)
+Autor: Emmanuel Domínguez Osio & Santiago Cruz Plaza
+Curso: Inteligencia Artificial — Licenciatura en Mecatrónica  
+Fecha: Mayo 2026
 
 ---
 
 ## 1. Objetivo
 
-Este repositorio presenta un sistema OCR didáctico que combina:
+Este repositorio presenta un sistema OCR didáctico que combina **tres enfoques**:
 
-1. **Un pipeline pre‑entrenado** ([EasyOCR](https://github.com/JaidedAI/EasyOCR)) para detección + reconocimiento de texto en escenas reales.
-2. **Un modelo CNN+CTC entrenado desde cero** sobre el dataset EMNIST/MNIST, para explicar paso a paso cómo aprende una red neuronal a leer caracteres.
-3. **Una interfaz web** en [Streamlit](https://streamlit.io/) donde el usuario sube una imagen y observa el resultado de ambos enfoques.
+1. **Pipeline pre‑entrenado** ([EasyOCR](https://github.com/JaidedAI/EasyOCR)) – detección + reconocimiento de texto en escenas reales.  
+2. **Modelo CNN+CTC entrenado desde cero** – red CRNN+CTC entrenada sobre pseudo‑palabras EMNIST.  
+3. **Segmentación por contornos + clasificador CNN** – extrae caracteres individuales y los clasifica con una CNN entrenada en EMNIST.
 
-El objetivo es educativo: permitir al estudiante comparar un sistema de producción contra un modelo propio y comprender las etapas internas (pre‑procesamiento → detección → reconocimiento → post‑procesamiento).
+El objetivo es educativo: comparar distintos paradigmas (secuencial vs. segmentación) y entender las etapas internas del OCR.
 
 ---
 
@@ -43,27 +43,34 @@ El objetivo es educativo: permitir al estudiante comparar un sistema de producci
 - **Reconocimiento**: transforma cada recorte en cadena de texto. La red estándar es **CRNN+CTC** ([Shi et al., 2015](https://arxiv.org/abs/1507.05717)).
 - **Post‑procesamiento**: aplica diccionarios o modelos de lenguaje para corregir errores.
 
+
 ---
 
 ## 3. Estructura del repositorio
 
 ```
 ocr_proyecto_ia/
-├── app/                      # Aplicación Streamlit (demo interactiva)
+├── app/                         # Aplicación Streamlit
 │   ├── streamlit_app.py
 │   └── utils.py
-├── modelo_personalizado/     # CNN+CTC entrenado desde cero
-│   ├── modelo.py             # Definición de la red
-│   ├── entrenar.py           # Script de entrenamiento
-│   ├── inferencia.py         # Predicción sobre imágenes
-│   └── decodificador_ctc.py  # Decodificador greedy / beam
+├── modelo_personalizado/        # CRNN+CTC entrenado desde cero
+│   ├── modelo.py
+│   ├── entrenar.py
+│   ├── inferencia.py
+│   └── decodificador_ctc.py
+├── segmentacion_ocr/            # Nuevo enfoque: segmentación + CNN
+│   ├── README.md                # Documentación específica
+│   ├── clasificador_emnist.py
+│   ├── segmentador.py
+│   ├── pipeline_segmentacion.py
+│   └── clasificador_pesos.weights.h5
 ├── notebooks/
-│   └── 01_emnist_cnn_ctc.ipynb   # Notebook didáctico paso a paso
-├── samples/                  # Imágenes de ejemplo
-├── docs/                     # Reporte y presentación
+│   └── 01_emnist_cnn_ctc.ipynb
+├── samples/                     # Imágenes de ejemplo
+├── docs/
 │   ├── Reporte_OCR.pdf
 │   └── Presentacion_OCR.pptx
-├── assets/                   # Diagramas, figuras
+├── assets/                      # Diagramas y figuras
 ├── requirements.txt
 └── README.md
 ```
@@ -73,30 +80,20 @@ ocr_proyecto_ia/
 ## 4. Instalación
 
 ```bash
-# 1. Clonar y crear entorno
 git clone <tu_repo>
 cd ocr_proyecto_ia
 python -m venv .venv
-source .venv/bin/activate   # En Windows: .venv\Scripts\activate
+source .venv/bin/activate      # Linux/macOS
+# .venv\Scripts\activate       # Windows
 
-# 2. Instalar dependencias
 pip install -r requirements.txt
 ```
 
-Dependencias principales:
-
-| Paquete       | Uso                                  |
-|---------------|--------------------------------------|
-| `easyocr`     | Pipeline pre‑entrenado (CRAFT+CRNN)  |
-| `torch`       | Backend para EasyOCR y modelo propio |
-| `tensorflow`  | Entrenamiento del modelo CNN+CTC     |
-| `streamlit`   | Interfaz web                         |
-| `opencv-python` | Pre‑procesamiento de imágenes      |
-| `numpy`, `pillow`, `matplotlib` | Utilidades             |
+**Dependencias clave**: `easyocr`, `tensorflow`, `streamlit`, `opencv-python`, `numpy`, `matplotlib`, `tensorflow-datasets` (para EMNIST).
 
 ---
 
-## 5. Uso rápido
+## 5. Uso de los tres enfoques
 
 ### a) Demo web (Streamlit)
 
@@ -104,61 +101,76 @@ Dependencias principales:
 streamlit run app/streamlit_app.py
 ```
 
-Sube una imagen con texto y observa:
-- Las cajas envolventes detectadas por EasyOCR.
-- El texto transcrito.
-- (Opcional) La predicción de tu modelo CNN+CTC entrenado sobre EMNIST.
+En la barra lateral puedes seleccionar:
+- **EasyOCR** (siempre activo).  
+- **Modelo CNN+CTC propio** (marcar casilla, requiere pesos entrenados).  
+- **Segmentación + CNN** (marcar casilla, requiere clasificador entrenado).
 
-### b) Entrenar el modelo propio
+La app muestra:
+- Imagen original y pre‑procesada.
+- Cajas detectadas (EasyOCR).
+- Texto reconocido y confianza.
+- Para segmentación: pasos intermedios y confianza por carácter.
+
+### b) Entrenar el modelo CRNN+CTC propio
 
 ```bash
 python modelo_personalizado/entrenar.py --epochs 10 --batch-size 64
 ```
+Los pesos se guardan en `modelo_personalizado/pesos.h5`.
 
-El script descarga EMNIST automáticamente y guarda los pesos en `modelo_personalizado/pesos.h5`.
+### c) Entrenar el clasificador de segmentación (CNN)
 
-### c) Inferencia con el modelo propio
+```bash
+cd segmentacion_ocr
+python clasificador_emnist.py --epochs 20 --batch-size 64
+```
+Los pesos se guardan en `segmentacion_ocr/clasificador_pesos.weights.h5`.
+
+### d) Inferencia con el modelo propio (línea de comandos)
 
 ```bash
 python modelo_personalizado/inferencia.py --imagen samples/palabra.png
 ```
 
----
+### e) Inferencia con segmentación (línea de comandos)
 
-## 6. Repositorios y datasets de referencia
-
-### Repositorios OCR estudiados
-
-| Repositorio | Enfoque | URL |
-|-------------|---------|-----|
-| Tesseract OCR | OCR clásico + LSTM | https://github.com/tesseract-ocr/tesseract |
-| EasyOCR | CRAFT + CRNN | https://github.com/JaidedAI/EasyOCR |
-| PaddleOCR | DBNet + CRNN/SVTR | https://github.com/PaddlePaddle/PaddleOCR |
-| docTR | Detección + reconocimiento documental | https://github.com/mindee/doctr |
-| TrOCR | Transformer end‑to‑end | https://github.com/microsoft/unilm/tree/master/trocr |
-| CRAFT | Detección a nivel de carácter | https://github.com/clovaai/CRAFT-pytorch |
-| Surya | OCR multi‑idioma con análisis de layout | https://github.com/VikParuchuri/surya |
-| MMOCR | Toolkit OpenMMLab | https://github.com/open-mmlab/mmocr |
-
-### Datasets utilizados / mencionados
-
-| Dataset | Tipo | Tamaño | Fuente |
-|---------|------|--------|--------|
-| MNIST | Dígitos manuscritos | 70 000 | http://yann.lecun.com/exdb/mnist/ |
-| EMNIST | Caracteres alfanuméricos manuscritos | 814 255 | https://www.nist.gov/itl/products-and-services/emnist-dataset |
-| IAM Handwriting DB | Texto manuscrito en inglés | 13 353 líneas | https://fki.tic.heia-fr.ch/databases/iam-handwriting-database |
-| ICDAR‑SROIE | Recibos escaneados | 1 000 imágenes | https://rrc.cvc.uab.es/?ch=13 |
-| Synth90k / MJSynth | Palabras sintéticas | 9 millones | https://www.robots.ox.ac.uk/~vgg/data/text/ |
-| SynthText | Texto en escenas sintéticas | 800 000 imágenes | https://www.robots.ox.ac.uk/~vgg/data/scenetext/ |
+```bash
+cd segmentacion_ocr
+python pipeline_segmentacion.py --imagen ../samples/palabra.png
+```
 
 ---
 
-## 7. Licencia
+## 6. Comparativa de los tres enfoques
 
-Código liberado bajo licencia MIT con fines educativos. Los modelos y datasets de terceros mantienen sus licencias originales.
+| Método                    | Tipo de entrenamiento            | Longitud variable | Interpretabilidad | Tamaño modelo | Precisión (EMNIST) |
+|---------------------------|----------------------------------|-------------------|-------------------|---------------|--------------------|
+| EasyOCR (pre‑entrenado)   | Masivo (multilingüe)             | Sí                | Baja              | ~64 MB        | No aplicable       |
+| CRNN+CTC propio           | Pseudo‑palabras EMNIST (secuencias) | No (fija)      | Media             | ~17 MB        | 78% (palabra)      |
+| Segmentación + CNN        | Caracteres EMNIST                | Sí                | Alta              | ~5 MB         | 99% (carácter)     |
 
 ---
 
-## 8. Cómo citar este proyecto
+## 7. Conjuntos de datos y repositorios externos
 
-> Domínguez Osio, E. (2026). *Sistema OCR Educativo con CNN+CTC y EasyOCR*. Proyecto de Inteligencia Artificial, Licenciatura en Ingeniería en Mecatrónica.
+| Dataset       | Uso                                      | Enlace |
+|---------------|------------------------------------------|--------|
+| EMNIST        | Entrenamiento clasificador CNN y CRNN+CTC | [NIST](https://www.nist.gov/itl/products-and-services/emnist-dataset) |
+| MNIST         | Fallback                                 | [Lecun](http://yann.lecun.com/exdb/mnist/) |
+| IAM           | Referencia (no usado directamente)       | [IAM](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database) |
+| ICDAR‑SROIE   | Referencia                               | [SROIE](https://rrc.cvc.uab.es/?ch=13) |
+
+Repositorios comparados: [EasyOCR](https://github.com/JaidedAI/EasyOCR), [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR), [TrOCR](https://github.com/microsoft/unilm/tree/master/trocr), [docTR](https://github.com/mindee/doctr), [MMOCR](https://github.com/open-mmlab/mmocr), [CRAFT](https://github.com/clovaai/CRAFT-pytorch).
+
+---
+
+## 8. Licencia
+
+Código bajo licencia MIT (fines educativos). Los modelos y datasets de terceros mantienen sus propias licencias.
+
+---
+
+## 9. Citación
+
+> Cruz Plaza, S. & Domínguez Osio, E. (2026). *Sistema OCR Educativo con CNN+CTC y EasyOCR*. Proyecto de Inteligencia Artificial, Licenciatura en Ingeniería en Mecatrónica.
