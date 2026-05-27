@@ -58,7 +58,7 @@ def dibujar_cajas(imagen: np.ndarray, resultados) -> np.ndarray:
 # ------------------------------------------------------------------
 # Modelo CNN+CTC propio (opcional)
 # ------------------------------------------------------------------
-PESOS_PATH = Path(__file__).parent.parent / "modelo_personalizado" / "pesos.h5"
+PESOS_PATH = Path(__file__).parent.parent / "modelo_personalizado" / "pesos.weights.h5"
 
 
 @st.cache_resource(show_spinner=False)
@@ -80,18 +80,26 @@ def intentar_cargar_modelo_propio():
         return None
 
 
-def predecir_con_modelo_propio(modelo, imagen_rgb: np.ndarray) -> str:
-    """Predice una palabra con el modelo CNN+CTC entrenado en EMNIST."""
+def predecir_con_modelo_propio(modelo, imagen_rgb: np.ndarray) -> List[Tuple]:
+    """
+    Predice con la CNN+CTC y devuelve resultados al estilo EasyOCR:
+    [(caja, texto, confianza), ...]
+    """
     import sys
 
     sys.path.append(str(PESOS_PATH.parent))
-    from decodificador_ctc import decodificar_greedy  # type: ignore
+    from decodificador_ctc import decodificar_greedy_con_confianza  # type: ignore
 
     gris = cv2.cvtColor(imagen_rgb, cv2.COLOR_RGB2GRAY)
-    # Normaliza al tamaño esperado por el modelo (32x128 por convención)
     redimensionada = cv2.resize(gris, (128, 32))
     normalizada = redimensionada.astype("float32") / 255.0
     entrada = normalizada[np.newaxis, ..., np.newaxis]
 
     prediccion = modelo.predict(entrada, verbose=0)
-    return decodificar_greedy(prediccion)
+    texto, confianza = decodificar_greedy_con_confianza(prediccion)
+    if not texto:
+        return []
+
+    alto, ancho = imagen_rgb.shape[:2]
+    caja = [[0, 0], [ancho, 0], [ancho, alto], [0, alto]]
+    return [(caja, texto, confianza)]

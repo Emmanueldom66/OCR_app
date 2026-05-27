@@ -112,10 +112,11 @@ Sube una imagen con texto y observa:
 ### b) Entrenar el modelo propio
 
 ```bash
+pip install tensorflow-datasets importlib_resources
 python modelo_personalizado/entrenar.py --epochs 10 --batch-size 64
 ```
 
-El script descarga EMNIST automáticamente y guarda los pesos en `modelo_personalizado/pesos.h5`.
+El script descarga EMNIST automáticamente (62 clases: dígitos + letras) y guarda los pesos en `modelo_personalizado/pesos.weights.h5`. Si falta `importlib_resources`, cae a MNIST (solo dígitos).
 
 ### c) Inferencia con el modelo propio
 

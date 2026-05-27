@@ -70,7 +70,7 @@ with st.sidebar:
     mostrar_cajas = st.checkbox("Dibujar cajas de detección", value=True)
     usar_modelo_propio = st.checkbox(
         "Probar también el modelo CNN+CTC propio", value=False,
-        help="Requiere que los pesos estén en modelo_personalizado/pesos.h5",
+        help="Requiere que los pesos estén en modelo_personalizado/pesos.weights.h5",
     )
 
     st.markdown("---")
@@ -119,50 +119,58 @@ if mostrar_preproc:
             st.image(denoise, use_column_width=True, clamp=True)
 
 # ------------------------------------------------------------------
+# Visualización compartida (EasyOCR y modelo propio)
+# ------------------------------------------------------------------
+def _mostrar_resultados_ocr(titulo: str, resultados, imagen_base, tiempo: float):
+    """Métricas, imagen anotada y texto — mismo layout para ambos modelos."""
+    col_img, col_met = st.columns([2, 1])
+    with col_img:
+        if mostrar_cajas and resultados:
+            imagen_anotada = dibujar_cajas(imagen_base.copy(), resultados)
+            st.image(imagen_anotada, use_column_width=True)
+        else:
+            st.image(imagen_pil, use_column_width=True)
+
+    with col_met:
+        st.metric("Tiempo de inferencia", f"{tiempo:.2f} s")
+        st.metric("Regiones detectadas", len(resultados))
+        if resultados:
+            conf_promedio = np.mean([r[2] for r in resultados])
+            st.metric("Confianza promedio", f"{conf_promedio:.2%}")
+
+    st.subheader("📝 Texto reconocido")
+    if not resultados:
+        st.warning("No se detectó texto en la imagen.")
+        return
+
+    for i, (_caja, texto, conf) in enumerate(resultados, 1):
+        st.markdown(f"**{i}.** `{texto}`  &nbsp;&nbsp; *(confianza: {conf:.2%})*")
+
+    texto_completo = "\n".join(r[1] for r in resultados)
+    st.text_area("Texto plano", texto_completo, height=120, key=f"texto_{titulo}")
+    st.download_button(
+        "💾 Descargar como .txt",
+        data=texto_completo.encode("utf-8"),
+        file_name=f"texto_extraido_{titulo}.txt",
+        mime="text/plain",
+        key=f"descarga_{titulo}",
+    )
+
+
+# ------------------------------------------------------------------
 # Detección + reconocimiento con EasyOCR
 # ------------------------------------------------------------------
 st.markdown("---")
 st.header("🤖 Resultado con EasyOCR (pre-entrenado)")
 
 with st.spinner("Cargando modelo EasyOCR (primera vez puede tardar)..."):
-    reader = cargar_easyocr(idioma if idioma else ["en"])
+    reader = cargar_easyocr(idioma or ["en"])
 
 t0 = time.time()
 resultados = reader.readtext(imagen_np)
 t1 = time.time()
 
-col3, col4 = st.columns([2, 1])
-with col3:
-    if mostrar_cajas:
-        imagen_anotada = dibujar_cajas(imagen_np.copy(), resultados)
-        st.image(imagen_anotada, use_column_width=True)
-    else:
-        st.image(imagen_pil, use_column_width=True)
-
-with col4:
-    st.metric("Tiempo de inferencia", f"{t1 - t0:.2f} s")
-    st.metric("Regiones detectadas", len(resultados))
-    if resultados:
-        conf_promedio = np.mean([r[2] for r in resultados])
-        st.metric("Confianza promedio", f"{conf_promedio:.2%}")
-
-st.subheader("📝 Texto reconocido")
-if not resultados:
-    st.warning("No se detectó texto en la imagen.")
-else:
-    for i, (caja, texto, conf) in enumerate(resultados, 1):
-        st.markdown(
-            f"**{i}.** `{texto}`  &nbsp;&nbsp; *(confianza: {conf:.2%})*"
-        )
-
-    texto_completo = "\n".join(r[1] for r in resultados)
-    st.text_area("Texto plano", texto_completo, height=120)
-    st.download_button(
-        "💾 Descargar como .txt",
-        data=texto_completo.encode("utf-8"),
-        file_name="texto_extraido.txt",
-        mime="text/plain",
-    )
+_mostrar_resultados_ocr("easyocr", resultados, imagen_np, t1 - t0)
 
 # ------------------------------------------------------------------
 # Modelo CNN+CTC propio (opcional)
@@ -170,23 +178,18 @@ else:
 if usar_modelo_propio:
     st.markdown("---")
     st.header("🧠 Resultado con modelo CNN+CTC propio (EMNIST)")
-
-    modelo = intentar_cargar_modelo_propio()
-    if modelo is None:
-        st.warning(
-            "No se encontraron pesos entrenados en "
-            "`modelo_personalizado/pesos.h5`. Ejecuta primero:\n\n"
-            "`python modelo_personalizado/entrenar.py --epochs 10`"
-        )
-    else:
-        with st.spinner("Prediciendo con la CNN+CTC..."):
-            prediccion = predecir_con_modelo_propio(modelo, imagen_np)
-        st.success(f"Predicción del modelo propio: **{prediccion}**")
-        st.caption(
-            "Nota: el modelo propio fue entrenado sobre caracteres aislados "
-            "(EMNIST). Funciona mejor con palabras manuscritas cortas en "
-            "fondo claro."
-        )
+    
+    with st.spinner("Prediciendo con la CNN+CTC..."): 
+        modelo = intentar_cargar_modelo_propio()
+        
+    t0_propio = time.time()
+    resultados_propio = predecir_con_modelo_propio(modelo, imagen_np)
+    t1_propio = time.time()
+    _mostrar_resultados_ocr("propio", resultados_propio, imagen_np, t1_propio - t0_propio)
+    st.caption(
+        "Nota: el modelo propio fue entrenado sobre caracteres aislados "
+        "(EMNIST). Trata la imagen completa como una sola región de texto."
+    )
 
 # ------------------------------------------------------------------
 # Footer

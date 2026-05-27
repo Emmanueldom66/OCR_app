@@ -60,9 +60,9 @@ Flujo de la demo:
 python modelo_personalizado/entrenar.py --epochs 10 --batch-size 64
 ```
 
-- Descarga EMNIST automáticamente (con fallback a MNIST si tensorflow-datasets falla).
+- Descarga EMNIST automáticamente (`pip install tensorflow-datasets importlib_resources`; fallback a MNIST si falla).
 - Genera 20 000 pseudo-palabras de 3–8 caracteres.
-- Guarda los pesos en `modelo_personalizado/pesos.h5`.
+- Guarda los pesos en `modelo_personalizado/pesos.weights.h5`.
 
 Después puedes marcar la casilla **"Probar también el modelo CNN+CTC propio"**
 en la app Streamlit para verlo en acción.
@@ -82,7 +82,7 @@ Opciones:
 | Argumento  | Valores            | Descripción                             |
 |------------|--------------------|-----------------------------------------|
 | `--imagen` | ruta a PNG/JPG     | Imagen a transcribir                    |
-| `--pesos`  | ruta a `.h5`       | Pesos entrenados (por defecto `pesos.h5`)|
+| `--pesos`  | ruta a `.h5`       | Pesos entrenados (por defecto `pesos.weights.h5`)|
 | `--metodo` | `greedy` / `beam`  | Algoritmo de decodificación CTC         |
 
 ---

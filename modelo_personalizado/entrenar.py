@@ -13,18 +13,22 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
 from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint, ReduceLROnPlateau
+import tensorflow_datasets as tfds
 
 from modelo import (
     ALFABETO,
     TAM_VOCAB,
     construir_modelo_entrenamiento,
 )
+
+ModelCheckpoint = tf.keras.callbacks.ModelCheckpoint
+ReduceLROnPlateau = tf.keras.callbacks.ReduceLROnPlateau
 
 
 # ------------------------------------------------------------------
@@ -33,14 +37,20 @@ from modelo import (
 def cargar_emnist():
     """Carga EMNIST byclass desde tensorflow_datasets, o cae a MNIST."""
     try:
-        import tensorflow_datasets as tfds
-
         ds = tfds.load("emnist/byclass", split="train", as_supervised=True)
         imgs, labels = [], []
         for img, lbl in ds.take(50_000):  # 50k para no saturar memoria
             imgs.append(img.numpy().squeeze())
             labels.append(int(lbl.numpy()))
+        print(f"✅ EMNIST cargado: {len(imgs)} caracteres, clases {min(labels)}–{max(labels)}")
         return np.array(imgs), np.array(labels)
+    except ModuleNotFoundError as e:
+        nombre = getattr(e, "name", str(e))
+        print(f"⚠️  Falta dependencia ({nombre}). Instala con:")
+        print("    pip install tensorflow-datasets importlib_resources")
+        print("    Se usa MNIST como fallback (solo dígitos 0-9).")
+        (x_train, y_train), _ = tf.keras.datasets.mnist.load_data()
+        return x_train, y_train
     except Exception as e:
         print(f"⚠️  No se pudo cargar EMNIST ({e}). Se usa MNIST como fallback.")
         (x_train, y_train), _ = tf.keras.datasets.mnist.load_data()
@@ -93,7 +103,7 @@ def generador_batches(X, Y, batch_size: int):
         idx = np.random.permutation(n)
         for i in range(0, n - batch_size + 1, batch_size):
             sel = idx[i : i + batch_size]
-            yield {"imagen": X[sel], "etiqueta": Y[sel].astype("float32")}, np.zeros(batch_size)
+            yield {"imagen": X[sel], "etiqueta": Y[sel]}, np.zeros((batch_size, 1), dtype="float32")
 
 
 # ------------------------------------------------------------------
@@ -101,8 +111,8 @@ def generador_batches(X, Y, batch_size: int):
 # ------------------------------------------------------------------
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch-size", type=int, default=100)
     parser.add_argument("--n-muestras", type=int, default=20_000)
     parser.add_argument("--longitud-max", type=int, default=8)
     args = parser.parse_args()
@@ -124,7 +134,7 @@ def main():
     modelo = construir_modelo_entrenamiento()
     modelo.summary()
 
-    salida_pesos = Path(__file__).parent / "pesos.h5"
+    salida_pesos = Path(__file__).parent / "pesos.weights.h5"
     callbacks = [
         ModelCheckpoint(str(salida_pesos), save_best_only=False, save_weights_only=True),
         ReduceLROnPlateau(patience=2, factor=0.5, verbose=1),

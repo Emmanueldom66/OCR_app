@@ -12,7 +12,9 @@ Salida:   secuencia de probabilidades sobre el vocabulario (CTC)
 from __future__ import annotations
 
 import tensorflow as tf
-from tensorflow.keras import layers, Model
+
+layers = tf.keras.layers
+Model = tf.keras.Model
 
 
 # Vocabulario: dígitos + letras mayúsculas (compatible con EMNIST 'byclass')
@@ -31,17 +33,20 @@ class CapaCTC(layers.Layer):
 
     def call(self, y_true, y_pred):
         batch = tf.shape(y_pred)[0]
-        long_entrada = tf.shape(y_pred)[1]
-        long_etiqueta = tf.shape(y_true)[1]
+        y_true = tf.cast(y_true, tf.int32)
+        # Etiquetas con -1 de relleno: longitud real y valores >= 0 para CTC
+        mascara = tf.not_equal(y_true, -1)
+        long_etiqueta = tf.reduce_sum(tf.cast(mascara, tf.int32), axis=1, keepdims=True)
+        y_true = tf.where(mascara, y_true, tf.zeros_like(y_true))
 
-        long_entrada = long_entrada * tf.ones((batch, 1), dtype="int64")
-        long_etiqueta = long_etiqueta * tf.ones((batch, 1), dtype="int64")
+        long_entrada = tf.fill([batch, 1], tf.shape(y_pred)[1])
 
         perdida = tf.keras.backend.ctc_batch_cost(
             y_true, y_pred, long_entrada, long_etiqueta
         )
         self.add_loss(tf.reduce_mean(perdida))
-        return y_pred
+        # Salida ficticia: evita ciclo en el grafo (Keras 3) y coincide con y=np.zeros del fit
+        return tf.zeros((batch, 1), dtype=y_pred.dtype)
 
 
 # ------------------------------------------------------------------
@@ -73,7 +78,7 @@ def _bloque_cnn(x):
 def construir_modelo_entrenamiento(altura: int = 32, ancho: int = 128) -> Model:
     """Construye el modelo CRNN+CTC para entrenar."""
     entrada_img = layers.Input(shape=(altura, ancho, 1), name="imagen")
-    etiqueta = layers.Input(shape=(None,), dtype="float32", name="etiqueta")
+    etiqueta = layers.Input(shape=(None,), dtype="int32", name="etiqueta")
 
     # CNN
     x = _bloque_cnn(entrada_img)

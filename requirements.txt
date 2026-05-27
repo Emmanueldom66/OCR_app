@@ -5,6 +5,8 @@ torchvision>=0.16.0
 
 # --- Modelo CNN+CTC propio ---
 tensorflow>=2.13.0
+tensorflow-datasets>=4.9.0
+importlib_resources>=6.0.0
 
 # --- Interfaz web ---
 streamlit>=1.30.0

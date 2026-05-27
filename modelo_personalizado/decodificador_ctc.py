@@ -10,21 +10,36 @@ import tensorflow as tf
 from modelo import ALFABETO
 
 
-def decodificar_greedy(predicciones: np.ndarray) -> str:
-    """Decodificación greedy: argmax + colapso de repeticiones + eliminación del blanco."""
+def _indices_greedy(predicciones: np.ndarray) -> np.ndarray:
     if predicciones.ndim == 3:
         predicciones = predicciones[0]
-    indices = np.argmax(predicciones, axis=-1)
+    return np.argmax(predicciones, axis=-1)
 
-    salida = []
+
+def decodificar_greedy(predicciones: np.ndarray) -> str:
+    """Decodificación greedy: argmax + colapso de repeticiones + eliminación del blanco."""
+    texto, _ = decodificar_greedy_con_confianza(predicciones)
+    return texto
+
+
+def decodificar_greedy_con_confianza(predicciones: np.ndarray) -> tuple[str, float]:
+    """Greedy + confianza media de los caracteres emitidos (prob. softmax)."""
+    if predicciones.ndim == 3:
+        predicciones = predicciones[0]
+    indices = _indices_greedy(predicciones)
+
+    salida: list[str] = []
+    confidencias: list[float] = []
     anterior = -1
-    for idx in indices:
-        if idx == anterior or idx == len(ALFABETO):  # blanco
+    for t, idx in enumerate(indices):
+        if idx == anterior or idx == len(ALFABETO):
             anterior = idx
             continue
         salida.append(ALFABETO[idx])
+        confidencias.append(float(predicciones[t, idx]))
         anterior = idx
-    return "".join(salida)
+    confianza = float(np.mean(confidencias)) if confidencias else 0.0
+    return "".join(salida), confianza
 
 
 def decodificar_beam(predicciones: np.ndarray, ancho_beam: int = 10) -> str:

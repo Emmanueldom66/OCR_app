@@ -29,7 +29,7 @@ def cargar_y_normalizar(ruta: str, alto: int = 32, ancho: int = 128) -> np.ndarr
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--imagen", required=True)
-    parser.add_argument("--pesos", default=str(Path(__file__).parent / "pesos.h5"))
+    parser.add_argument("--pesos", default=str(Path(__file__).parent / "pesos.weights.h5"))
     parser.add_argument("--metodo", choices=["greedy", "beam"], default="greedy")
     args = parser.parse_args()
 
